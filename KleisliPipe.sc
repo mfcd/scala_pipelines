@@ -118,6 +118,7 @@ val w = rAgain.written
   OK, all this makes sense.
   However, we have dropped the log file. How's that?
   Well, it turns out monads are not commutative
+  http://stackoverflow.com/questions/34357881/scalaz-function-composition-writert
 */
 
 type W[A] = Writer[List[String], A]
