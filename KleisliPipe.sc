@@ -93,15 +93,15 @@ val weirdPipeEither =
   (kSafeDivEither *** (kSafeDivEither >>> kMinusOne)) >>> kSafeDivEither
 val failsButWhere = weirdPipeEither run ((4.0,1.0), (1.0,1.0))
 
-type W[O] = WriterT[EEither, NonEmptyList[String],O]
+type Wrtr[O] = WriterT[EEither, NonEmptyList[String],O]
 
-val sqrtWithLog: Kleisli[W, Double, Double] =
-  Kleisli.kleisli[W, Double, Double](t =>
+val sqrtWithLog: Kleisli[Wrtr, Double, Double] =
+  Kleisli.kleisli[Wrtr, Double, Double](t =>
     WriterT.put(safeSqrtEither(t))(s"squared $t".wrapNel)
   )
 
-val safeDivWithLog: Kleisli[W, (Double,Double), Double] =
-  Kleisli.kleisli[W, (Double, Double), Double]( (t: (Double, Double)) => {
+val safeDivWithLog: Kleisli[Wrtr, (Double,Double), Double] =
+  Kleisli.kleisli[Wrtr, (Double, Double), Double]( (t: (Double, Double)) => {
     val (n,d) = t
     WriterT.put(safeDivEither(t))(s"divided $n by $d".wrapNel)
   })
@@ -112,3 +112,24 @@ val r = combinedFunction run 16.0
 val combinedFunction2 = safeDivWithLog >>> sqrtWithLog
 val rAgain = combinedFunction2 run (-10.0,2.0)
 val w = rAgain.written
+
+
+/*
+  OK, all this makes sense.
+  However, we have dropped the log file. How's that?
+  Well, it turns out monads are not commutative
+*/
+
+type W[A] = Writer[List[String], A]
+type E[A] = EitherT[W, MyError, A]
+
+val sqrtWithLog2: Kleisli[E, Double, Double] =
+  Kleisli.kleisli[E, Double, Double](t =>
+    EitherT[W, MyError, Double](safeSqrtEither(t).set(List(s"squared $t")))
+  )
+
+val constNegative1: Kleisli[E, Double, Double] =
+  Kleisli.kleisli[E, Double, Double](_ => -1.0.point[E])
+
+val combinedFunctionEitherT = sqrtWithLog2 >>> constNegative1 >>> sqrtWithLog2
+combinedFunctionEitherT.run(16.0).run.written
